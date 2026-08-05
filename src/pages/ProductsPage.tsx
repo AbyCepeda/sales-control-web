@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { AppButton } from "../components/ui/AppButton";
 import { AppInput } from "../components/ui/AppInput";
+import { Pagination } from "../components/ui/Pagination";
 import type { Product } from "../features/products/product.types";
 import { useGetProductsQuery } from "../services/productsApi";
 
@@ -48,9 +49,10 @@ function ProductMobileCard({ product }: { product: Product }) {
         </span>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-3">
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="rounded-2xl bg-slate-100 p-4">
           <p className="text-xs font-bold uppercase text-slate-500">Precio</p>
+
           <p className="mt-1 text-xl font-extrabold text-slate-950">
             {formatMoney(product.price)}
           </p>
@@ -58,6 +60,7 @@ function ProductMobileCard({ product }: { product: Product }) {
 
         <div className="rounded-2xl bg-slate-100 p-4">
           <p className="text-xs font-bold uppercase text-slate-500">Stock</p>
+
           <p className="mt-1 text-xl font-extrabold text-slate-950">
             {product.stock}
           </p>
@@ -69,6 +72,8 @@ function ProductMobileCard({ product }: { product: Product }) {
 
 export function ProductsPage() {
   const [searchText, setSearchText] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const {
     data: productsResponse,
@@ -95,6 +100,28 @@ export function ProductsPage() {
       return searchableText.includes(normalizedSearch);
     });
   }, [products, searchText]);
+
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+
+    return filteredProducts.slice(startIndex, endIndex);
+  }, [filteredProducts, currentPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchText, pageSize]);
+
+  useEffect(() => {
+    const totalPages = Math.max(
+      Math.ceil(filteredProducts.length / pageSize),
+      1,
+    );
+
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, filteredProducts.length, pageSize]);
 
   const activeProducts = products.filter((product) => product.isActive).length;
   const inactiveProducts = products.length - activeProducts;
@@ -124,6 +151,7 @@ export function ProductsPage() {
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <div className="rounded-3xl bg-slate-950 p-5 shadow-sm">
           <p className="text-sm font-semibold text-slate-400">Total</p>
+
           <p className="mt-2 text-3xl font-extrabold text-white">
             {products.length}
           </p>
@@ -131,6 +159,7 @@ export function ProductsPage() {
 
         <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
           <p className="text-sm font-semibold text-emerald-700">Activos</p>
+
           <p className="mt-2 text-3xl font-extrabold text-emerald-700">
             {activeProducts}
           </p>
@@ -138,6 +167,7 @@ export function ProductsPage() {
 
         <div className="rounded-3xl border border-red-200 bg-red-50 p-5 shadow-sm">
           <p className="text-sm font-semibold text-red-600">Inactivos</p>
+
           <p className="mt-2 text-3xl font-extrabold text-red-600">
             {inactiveProducts}
           </p>
@@ -160,6 +190,7 @@ export function ProductsPage() {
       {isLoading ? (
         <div className="mt-6 rounded-3xl bg-white p-8 text-center shadow-sm">
           <p className="font-bold text-slate-950">Cargando productos...</p>
+
           <p className="mt-2 text-sm text-slate-500">
             Estamos consultando la API.
           </p>
@@ -182,7 +213,7 @@ export function ProductsPage() {
         <>
           {/* Mobile / tablet cards */}
           <div className="mt-6 grid gap-4 lg:hidden">
-            {filteredProducts.map((product) => (
+            {paginatedProducts.map((product) => (
               <ProductMobileCard key={product.id} product={product} />
             ))}
           </div>
@@ -196,15 +227,19 @@ export function ProductsPage() {
                     <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-widest text-slate-500">
                       SKU
                     </th>
+
                     <th className="px-5 py-4 text-left text-xs font-black uppercase tracking-widest text-slate-500">
                       Producto
                     </th>
+
                     <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-widest text-slate-500">
                       Precio
                     </th>
+
                     <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-widest text-slate-500">
                       Stock
                     </th>
+
                     <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-widest text-slate-500">
                       Estado
                     </th>
@@ -212,7 +247,7 @@ export function ProductsPage() {
                 </thead>
 
                 <tbody className="divide-y divide-slate-100">
-                  {filteredProducts.map((product) => (
+                  {paginatedProducts.map((product) => (
                     <tr key={product.id} className="hover:bg-slate-50">
                       <td className="whitespace-nowrap px-5 py-4 text-sm font-bold text-slate-700">
                         {product.sku}
@@ -222,6 +257,7 @@ export function ProductsPage() {
                         <p className="font-bold text-slate-950">
                           {product.name}
                         </p>
+
                         <p className="mt-1 max-w-xl text-sm text-slate-500">
                           {product.description ?? "Sin descripción"}
                         </p>
@@ -252,6 +288,15 @@ export function ProductsPage() {
               </table>
             </div>
           </div>
+
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredProducts.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            itemLabel="productos"
+          />
         </>
       ) : (
         <div className="mt-6 rounded-3xl bg-white p-8 text-center shadow-sm">
