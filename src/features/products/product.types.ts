@@ -1,0 +1,17 @@
+export type Product = {
+  id: number;
+  sku: string;
+  name: string;
+  description: string | null;
+  price: string;
+  stock: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ApiResponse<T> = {
+  success: boolean;
+  message: string;
+  data: T;
+};
