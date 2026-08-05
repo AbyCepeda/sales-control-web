@@ -10,6 +10,8 @@ import type {
 } from "../features/orders/order.types";
 import { useGetOrdersQuery } from "../services/ordersApi";
 
+const SUBTABLE_INITIAL_LIMIT = 5;
+
 function formatMoney(value?: string | number | null) {
   const amount = Number(value ?? 0);
 
@@ -77,8 +79,44 @@ function getCustomerPaidAmount(customerOrder: CustomerOrder) {
   }, 0);
 }
 
+function ShowMoreButton({
+  total,
+  visibleCount,
+  isExpanded,
+  onToggle,
+  label,
+}: {
+  total: number;
+  visibleCount: number;
+  isExpanded: boolean;
+  onToggle: () => void;
+  label: string;
+}) {
+  if (total <= visibleCount) {
+    return null;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="mt-3 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-950 transition hover:bg-slate-50"
+    >
+      {isExpanded
+        ? `Ver menos ${label}`
+        : `Ver más ${label} (${total - visibleCount} más)`}
+    </button>
+  );
+}
+
 function OrderMobileCard({ order }: { order: Order }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [expandedItemsByCustomer, setExpandedItemsByCustomer] = useState<
+    Record<number, boolean>
+  >({});
+  const [expandedPaymentsByCustomer, setExpandedPaymentsByCustomer] = useState<
+    Record<number, boolean>
+  >({});
 
   const customerNames = order.customerOrders
     .map((customerOrder) => customerOrder.customer.name)
@@ -86,6 +124,20 @@ function OrderMobileCard({ order }: { order: Order }) {
 
   const paidAmount = getOrderPaidAmount(order);
   const pendingAmount = getOrderPendingAmount(order);
+
+  function toggleCustomerItems(customerOrderId: number) {
+    setExpandedItemsByCustomer((current) => ({
+      ...current,
+      [customerOrderId]: !current[customerOrderId],
+    }));
+  }
+
+  function toggleCustomerPayments(customerOrderId: number) {
+    setExpandedPaymentsByCustomer((current) => ({
+      ...current,
+      [customerOrderId]: !current[customerOrderId],
+    }));
+  }
 
   return (
     <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -159,6 +211,20 @@ function OrderMobileCard({ order }: { order: Order }) {
               0,
             );
 
+            const areItemsExpanded =
+              expandedItemsByCustomer[customerOrder.id] ?? false;
+
+            const arePaymentsExpanded =
+              expandedPaymentsByCustomer[customerOrder.id] ?? false;
+
+            const visibleItems = areItemsExpanded
+              ? customerOrder.items
+              : customerOrder.items.slice(0, SUBTABLE_INITIAL_LIMIT);
+
+            const visiblePayments = arePaymentsExpanded
+              ? customerOrder.payments
+              : customerOrder.payments.slice(0, SUBTABLE_INITIAL_LIMIT);
+
             return (
               <div
                 key={customerOrder.id}
@@ -197,36 +263,50 @@ function OrderMobileCard({ order }: { order: Order }) {
                   </div>
                 </div>
 
-                <div className="mt-4 space-y-2">
-                  {customerOrder.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="rounded-xl bg-white p-3 text-sm"
-                    >
-                      <p className="font-bold text-slate-950">
-                        {item.nameSnapshot}
-                      </p>
+                <div className="mt-4 rounded-2xl bg-white p-3">
+                  <p className="text-sm font-extrabold text-slate-950">
+                    Artículos ({customerOrder.items.length})
+                  </p>
 
-                      <p className="mt-1 text-slate-500">
-                        SKU {item.skuSnapshot} · Cantidad {item.quantity} ·{" "}
-                        {formatMoney(item.unitPriceSnapshot)}
-                      </p>
+                  <div className="mt-3 space-y-2">
+                    {visibleItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="rounded-xl border border-slate-100 p-3 text-sm"
+                      >
+                        <p className="font-bold text-slate-950">
+                          {item.nameSnapshot}
+                        </p>
 
-                      <p className="mt-1 font-bold text-slate-950">
-                        Subtotal: {formatMoney(item.subtotal)}
-                      </p>
-                    </div>
-                  ))}
+                        <p className="mt-1 text-slate-500">
+                          SKU {item.skuSnapshot} · Cantidad {item.quantity} ·{" "}
+                          {formatMoney(item.unitPriceSnapshot)}
+                        </p>
+
+                        <p className="mt-1 font-bold text-slate-950">
+                          Subtotal: {formatMoney(item.subtotal)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <ShowMoreButton
+                    total={customerOrder.items.length}
+                    visibleCount={SUBTABLE_INITIAL_LIMIT}
+                    isExpanded={areItemsExpanded}
+                    onToggle={() => toggleCustomerItems(customerOrder.id)}
+                    label="artículos"
+                  />
                 </div>
 
-                {customerOrder.payments.length ? (
-                  <div className="mt-4 rounded-2xl bg-white p-3">
-                    <p className="text-sm font-extrabold text-slate-950">
-                      Abonos
-                    </p>
+                <div className="mt-4 rounded-2xl bg-white p-3">
+                  <p className="text-sm font-extrabold text-slate-950">
+                    Abonos ({customerOrder.payments.length})
+                  </p>
 
-                    <div className="mt-2 space-y-2">
-                      {customerOrder.payments.map((payment) => (
+                  {visiblePayments.length ? (
+                    <div className="mt-3 space-y-2">
+                      {visiblePayments.map((payment) => (
                         <div
                           key={payment.id}
                           className="rounded-xl border border-slate-100 p-3"
@@ -245,8 +325,20 @@ function OrderMobileCard({ order }: { order: Order }) {
                         </div>
                       ))}
                     </div>
-                  </div>
-                ) : null}
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-500">
+                      Este cliente todavía no tiene abonos registrados.
+                    </p>
+                  )}
+
+                  <ShowMoreButton
+                    total={customerOrder.payments.length}
+                    visibleCount={SUBTABLE_INITIAL_LIMIT}
+                    isExpanded={arePaymentsExpanded}
+                    onToggle={() => toggleCustomerPayments(customerOrder.id)}
+                    label="abonos"
+                  />
+                </div>
               </div>
             );
           })}
@@ -257,6 +349,27 @@ function OrderMobileCard({ order }: { order: Order }) {
 }
 
 function OrderExpandedRow({ order }: { order: Order }) {
+  const [expandedItemsByCustomer, setExpandedItemsByCustomer] = useState<
+    Record<number, boolean>
+  >({});
+  const [expandedPaymentsByCustomer, setExpandedPaymentsByCustomer] = useState<
+    Record<number, boolean>
+  >({});
+
+  function toggleCustomerItems(customerOrderId: number) {
+    setExpandedItemsByCustomer((current) => ({
+      ...current,
+      [customerOrderId]: !current[customerOrderId],
+    }));
+  }
+
+  function toggleCustomerPayments(customerOrderId: number) {
+    setExpandedPaymentsByCustomer((current) => ({
+      ...current,
+      [customerOrderId]: !current[customerOrderId],
+    }));
+  }
+
   return (
     <tr>
       <td colSpan={8} className="bg-slate-50 px-6 py-5">
@@ -276,6 +389,20 @@ function OrderExpandedRow({ order }: { order: Order }) {
                 Number(customerOrder.total) - customerPaid,
                 0,
               );
+
+              const areItemsExpanded =
+                expandedItemsByCustomer[customerOrder.id] ?? false;
+
+              const arePaymentsExpanded =
+                expandedPaymentsByCustomer[customerOrder.id] ?? false;
+
+              const visibleItems = areItemsExpanded
+                ? customerOrder.items
+                : customerOrder.items.slice(0, SUBTABLE_INITIAL_LIMIT);
+
+              const visiblePayments = arePaymentsExpanded
+                ? customerOrder.payments
+                : customerOrder.payments.slice(0, SUBTABLE_INITIAL_LIMIT);
 
               return (
                 <div
@@ -328,88 +455,115 @@ function OrderExpandedRow({ order }: { order: Order }) {
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-slate-200">
-                      <thead className="bg-white">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
-                            SKU
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
-                            Artículo
-                          </th>
-
-                          <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
-                            Cantidad
-                          </th>
-
-                          <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
-                            Precio
-                          </th>
-
-                          <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
-                            Subtotal
-                          </th>
-
-                          <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
-                            Estado
-                          </th>
-                        </tr>
-                      </thead>
-
-                      <tbody className="divide-y divide-slate-100">
-                        {customerOrder.items.map((item) => (
-                          <tr key={item.id}>
-                            <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-slate-700">
-                              {item.skuSnapshot}
-                            </td>
-
-                            <td className="px-4 py-3">
-                              <p className="font-bold text-slate-950">
-                                {item.nameSnapshot}
-                              </p>
-
-                              <p className="mt-1 text-sm text-slate-500">
-                                {item.descriptionSnapshot ?? "Sin descripción"}
-                              </p>
-                            </td>
-
-                            <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-bold text-slate-700">
-                              {item.quantity}
-                            </td>
-
-                            <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-bold text-slate-700">
-                              {formatMoney(item.unitPriceSnapshot)}
-                            </td>
-
-                            <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-extrabold text-slate-950">
-                              {formatMoney(item.subtotal)}
-                            </td>
-
-                            <td className="whitespace-nowrap px-4 py-3 text-right">
-                              <span
-                                className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
-                                  item.isPaid
-                                    ? "bg-emerald-50 text-emerald-700"
-                                    : "bg-orange-50 text-orange-700"
-                                }`}
-                              >
-                                {item.isPaid ? "Pagado" : "Pendiente"}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {customerOrder.payments.length ? (
-                    <div className="border-t border-slate-200 bg-slate-50 p-4">
+                  <div className="p-4">
+                    <div className="flex items-center justify-between gap-4">
                       <p className="text-sm font-extrabold text-slate-950">
-                        Abonos registrados
+                        Artículos ({customerOrder.items.length})
                       </p>
 
+                      <ShowMoreButton
+                        total={customerOrder.items.length}
+                        visibleCount={SUBTABLE_INITIAL_LIMIT}
+                        isExpanded={areItemsExpanded}
+                        onToggle={() => toggleCustomerItems(customerOrder.id)}
+                        label="artículos"
+                      />
+                    </div>
+
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="min-w-full divide-y divide-slate-200">
+                        <thead className="bg-white">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
+                              SKU
+                            </th>
+
+                            <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
+                              Artículo
+                            </th>
+
+                            <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
+                              Cantidad
+                            </th>
+
+                            <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
+                              Precio
+                            </th>
+
+                            <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
+                              Subtotal
+                            </th>
+
+                            <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
+                              Estado
+                            </th>
+                          </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-slate-100">
+                          {visibleItems.map((item) => (
+                            <tr key={item.id}>
+                              <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-slate-700">
+                                {item.skuSnapshot}
+                              </td>
+
+                              <td className="px-4 py-3">
+                                <p className="font-bold text-slate-950">
+                                  {item.nameSnapshot}
+                                </p>
+
+                                <p className="mt-1 text-sm text-slate-500">
+                                  {item.descriptionSnapshot ??
+                                    "Sin descripción"}
+                                </p>
+                              </td>
+
+                              <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-bold text-slate-700">
+                                {item.quantity}
+                              </td>
+
+                              <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-bold text-slate-700">
+                                {formatMoney(item.unitPriceSnapshot)}
+                              </td>
+
+                              <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-extrabold text-slate-950">
+                                {formatMoney(item.subtotal)}
+                              </td>
+
+                              <td className="whitespace-nowrap px-4 py-3 text-right">
+                                <span
+                                  className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
+                                    item.isPaid
+                                      ? "bg-emerald-50 text-emerald-700"
+                                      : "bg-orange-50 text-orange-700"
+                                  }`}
+                                >
+                                  {item.isPaid ? "Pagado" : "Pendiente"}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <p className="text-sm font-extrabold text-slate-950">
+                        Abonos registrados ({customerOrder.payments.length})
+                      </p>
+
+                      <ShowMoreButton
+                        total={customerOrder.payments.length}
+                        visibleCount={SUBTABLE_INITIAL_LIMIT}
+                        isExpanded={arePaymentsExpanded}
+                        onToggle={() => toggleCustomerPayments(customerOrder.id)}
+                        label="abonos"
+                      />
+                    </div>
+
+                    {visiblePayments.length ? (
                       <div className="mt-3 overflow-x-auto">
                         <table className="min-w-full divide-y divide-slate-200">
                           <thead>
@@ -433,7 +587,7 @@ function OrderExpandedRow({ order }: { order: Order }) {
                           </thead>
 
                           <tbody className="divide-y divide-slate-200">
-                            {customerOrder.payments.map((payment) => (
+                            {visiblePayments.map((payment) => (
                               <tr key={payment.id}>
                                 <td className="whitespace-nowrap py-2 pr-4 text-sm text-slate-600">
                                   {formatDate(payment.createdAt)}
@@ -455,14 +609,12 @@ function OrderExpandedRow({ order }: { order: Order }) {
                           </tbody>
                         </table>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="border-t border-slate-200 bg-slate-50 p-4">
-                      <p className="text-sm text-slate-500">
+                    ) : (
+                      <p className="mt-3 text-sm text-slate-500">
                         Este cliente todavía no tiene abonos registrados.
                       </p>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               );
             })}
