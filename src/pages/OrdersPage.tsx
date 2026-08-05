@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { AppButton } from "../components/ui/AppButton";
 import { AppInput } from "../components/ui/AppInput";
+import { Pagination } from "../components/ui/Pagination";
 import type {
   CustomerOrder,
   Order,
@@ -55,9 +56,12 @@ function getStatusClassName(status: OrderStatus) {
 
 function getOrderPaidAmount(order: Order) {
   return order.customerOrders.reduce((orderTotal, customerOrder) => {
-    const customerPaid = customerOrder.payments.reduce((paymentTotal, payment) => {
-      return paymentTotal + Number(payment.amount);
-    }, 0);
+    const customerPaid = customerOrder.payments.reduce(
+      (paymentTotal, payment) => {
+        return paymentTotal + Number(payment.amount);
+      },
+      0,
+    );
 
     return orderTotal + customerPaid;
   }, 0);
@@ -98,6 +102,10 @@ function OrderMobileCard({ order }: { order: Order }) {
           <p className="mt-1 text-sm text-slate-500">
             Vendedor: {order.seller.name}
           </p>
+
+          <p className="mt-1 text-xs text-slate-400">
+            {formatDate(order.purchaseDate)}
+          </p>
         </div>
 
         <span
@@ -109,7 +117,7 @@ function OrderMobileCard({ order }: { order: Order }) {
         </span>
       </div>
 
-      <div className="mt-5 grid grid-cols-3 gap-3">
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-2xl bg-slate-100 p-3">
           <p className="text-xs font-bold uppercase text-slate-500">Total</p>
           <p className="mt-1 text-base font-extrabold text-slate-950">
@@ -164,7 +172,7 @@ function OrderMobileCard({ order }: { order: Order }) {
                   Tel: {customerOrder.customer.phone ?? "Sin teléfono"}
                 </p>
 
-                <div className="mt-4 grid grid-cols-3 gap-2">
+                <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <div>
                     <p className="text-xs font-bold text-slate-500">Total</p>
                     <p className="font-extrabold text-slate-950">
@@ -210,6 +218,35 @@ function OrderMobileCard({ order }: { order: Order }) {
                     </div>
                   ))}
                 </div>
+
+                {customerOrder.payments.length ? (
+                  <div className="mt-4 rounded-2xl bg-white p-3">
+                    <p className="text-sm font-extrabold text-slate-950">
+                      Abonos
+                    </p>
+
+                    <div className="mt-2 space-y-2">
+                      {customerOrder.payments.map((payment) => (
+                        <div
+                          key={payment.id}
+                          className="rounded-xl border border-slate-100 p-3"
+                        >
+                          <p className="font-extrabold text-emerald-700">
+                            {formatMoney(payment.amount)}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            {payment.method} · {formatDate(payment.createdAt)}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            {payment.notes ?? "Sin notas"}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             );
           })}
@@ -439,6 +476,8 @@ function OrderExpandedRow({ order }: { order: Order }) {
 export function OrdersPage() {
   const [searchText, setSearchText] = useState("");
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const {
     data: ordersResponse,
@@ -463,18 +502,43 @@ export function OrdersPage() {
         .join(" ");
 
       const searchableText = normalizeSearchText(
-        `${order.id} ${order.seller.name} ${customerNames} ${order.status}`,
+        `${order.id} ${order.seller.name} ${order.seller.email} ${customerNames} ${order.status}`,
       );
 
       return searchableText.includes(normalizedSearch);
     });
   }, [orders, searchText]);
 
-  const pendingOrders = orders.filter((order) => order.status === "PENDING").length;
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+
+    return filteredOrders.slice(startIndex, endIndex);
+  }, [filteredOrders, currentPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setExpandedOrderId(null);
+  }, [searchText, pageSize]);
+
+  useEffect(() => {
+    const totalPages = Math.max(Math.ceil(filteredOrders.length / pageSize), 1);
+
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, filteredOrders.length, pageSize]);
+
+  const pendingOrders = orders.filter(
+    (order) => order.status === "PENDING",
+  ).length;
+
   const paidOrders = orders.filter((order) => order.status === "PAID").length;
+
   const deliveredOrders = orders.filter(
     (order) => order.status === "DELIVERED",
   ).length;
+
   const cancelledOrders = orders.filter(
     (order) => order.status === "CANCELLED",
   ).length;
@@ -575,14 +639,12 @@ export function OrdersPage() {
         </div>
       ) : filteredOrders.length ? (
         <>
-          {/* Mobile cards */}
           <div className="mt-6 grid gap-4 xl:hidden">
-            {filteredOrders.map((order) => (
+            {paginatedOrders.map((order) => (
               <OrderMobileCard key={order.id} order={order} />
             ))}
           </div>
 
-          {/* Desktop expandable table */}
           <div className="mt-6 hidden overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm xl:block">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-200">
@@ -621,7 +683,7 @@ export function OrdersPage() {
                 </thead>
 
                 <tbody className="divide-y divide-slate-100">
-                  {filteredOrders.map((order) => {
+                  {paginatedOrders.map((order) => {
                     const isExpanded = expandedOrderId === order.id;
 
                     const customerNames = order.customerOrders
@@ -632,8 +694,8 @@ export function OrdersPage() {
                     const pendingAmount = getOrderPendingAmount(order);
 
                     return (
-                      <>
-                        <tr key={order.id} className="hover:bg-slate-50">
+                      <Fragment key={order.id}>
+                        <tr className="hover:bg-slate-50">
                           <td className="px-5 py-4">
                             <button
                               type="button"
@@ -702,16 +764,23 @@ export function OrdersPage() {
                           </td>
                         </tr>
 
-                        {isExpanded ? (
-                          <OrderExpandedRow key={`expanded-${order.id}`} order={order} />
-                        ) : null}
-                      </>
+                        {isExpanded ? <OrderExpandedRow order={order} /> : null}
+                      </Fragment>
                     );
                   })}
                 </tbody>
               </table>
             </div>
           </div>
+
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredOrders.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            itemLabel="pedidos"
+          />
         </>
       ) : (
         <div className="mt-6 rounded-3xl bg-white p-8 text-center shadow-sm">
