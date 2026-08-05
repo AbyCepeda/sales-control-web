@@ -1,7 +1,11 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { PrivateRoute } from "./components/layout/PrivateRoute";
+import { CustomersPage } from "./pages/CustomersPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
+import { OrdersPage } from "./pages/OrdersPage";
+import { ProductsPage } from "./pages/ProductsPage";
+import { UsersPage } from "./pages/UsersPage";
 
 export default function App() {
   return (
@@ -14,6 +18,42 @@ export default function App() {
         element={
           <PrivateRoute>
             <DashboardPage />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/orders"
+        element={
+          <PrivateRoute>
+            <OrdersPage />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/products"
+        element={
+          <PrivateRoute>
+            <ProductsPage />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/customers"
+        element={
+          <PrivateRoute>
+            <CustomersPage />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/users"
+        element={
+          <PrivateRoute>
+            <UsersPage />
           </PrivateRoute>
         }
       />
