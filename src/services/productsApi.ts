@@ -1,5 +1,9 @@
 import { api } from "./api";
-import type { ApiResponse, Product } from "../features/products/product.types";
+import type {
+  ApiResponse,
+  CreateProductRequest,
+  Product,
+} from "../features/products/product.types";
 
 export const productsApi = api.injectEndpoints({
   endpoints: (builder) => ({
@@ -10,7 +14,16 @@ export const productsApi = api.injectEndpoints({
       }),
       providesTags: ["Products"],
     }),
+
+    createProduct: builder.mutation<ApiResponse<Product>, CreateProductRequest>({
+      query: (body) => ({
+        url: "/products",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Products", "Dashboard"],
+    }),
   }),
 });
 
-export const { useGetProductsQuery } = productsApi;
+export const { useGetProductsQuery, useCreateProductMutation } = productsApi;

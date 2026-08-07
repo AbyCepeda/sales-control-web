@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
+import type React from "react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { AppButton } from "../components/ui/AppButton";
 import { AppInput } from "../components/ui/AppInput";
+import { AppModal } from "../components/ui/AppModal";
 import { Pagination } from "../components/ui/Pagination";
 import type { Product } from "../features/products/product.types";
-import { useGetProductsQuery } from "../services/productsApi";
+import {
+  useCreateProductMutation,
+  useGetProductsQuery,
+} from "../services/productsApi";
 
 function formatMoney(value?: string | number | null) {
   const amount = Number(value ?? 0);
@@ -70,10 +75,29 @@ function ProductMobileCard({ product }: { product: Product }) {
   );
 }
 
+type ProductFormState = {
+  sku: string;
+  name: string;
+  description: string;
+  price: string;
+  stock: string;
+};
+
+const initialProductForm: ProductFormState = {
+  sku: "",
+  name: "",
+  description: "",
+  price: "",
+  stock: "",
+};
+
 export function ProductsPage() {
   const [searchText, setSearchText] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [productForm, setProductForm] =
+    useState<ProductFormState>(initialProductForm);
 
   const {
     data: productsResponse,
@@ -82,6 +106,9 @@ export function ProductsPage() {
     error,
     refetch,
   } = useGetProductsQuery();
+
+  const [createProduct, { isLoading: isCreatingProduct }] =
+    useCreateProductMutation();
 
   const products = productsResponse?.data ?? [];
 
@@ -126,6 +153,77 @@ export function ProductsPage() {
   const activeProducts = products.filter((product) => product.isActive).length;
   const inactiveProducts = products.length - activeProducts;
 
+  function handleOpenCreateModal() {
+    setProductForm(initialProductForm);
+    setIsCreateModalOpen(true);
+  }
+
+  function handleCloseCreateModal() {
+    if (isCreatingProduct) {
+      return;
+    }
+
+    setIsCreateModalOpen(false);
+    setProductForm(initialProductForm);
+  }
+
+  function updateProductForm(field: keyof ProductFormState, value: string) {
+    setProductForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  async function handleCreateProduct(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    const sku = productForm.sku.trim();
+    const name = productForm.name.trim();
+    const description = productForm.description.trim();
+    const price = Number(productForm.price);
+    const stock = Number(productForm.stock);
+
+    if (!sku || !name) {
+      alert("SKU y nombre son obligatorios.");
+      return;
+    }
+
+    if (Number.isNaN(price) || price <= 0) {
+      alert("El precio debe ser mayor a 0.");
+      return;
+    }
+
+    if (!Number.isInteger(stock) || stock < 0) {
+      alert("El stock debe ser un número entero mayor o igual a 0.");
+      return;
+    }
+
+    try {
+      await createProduct({
+        sku,
+        name,
+        description: description || null,
+        price,
+        stock,
+      }).unwrap();
+
+      setIsCreateModalOpen(false);
+      setProductForm(initialProductForm);
+      setCurrentPage(1);
+    } catch (error: any) {
+      console.log("CREATE_PRODUCT_ERROR:", JSON.stringify(error, null, 2));
+
+      const message =
+        error?.data?.message ??
+        error?.error ??
+        "No se pudo crear el producto.";
+
+      alert(message);
+    }
+  }
+
   return (
     <AppLayout>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -143,9 +241,15 @@ export function ProductsPage() {
           </p>
         </div>
 
-        <AppButton variant="outline" onClick={() => refetch()}>
-          {isFetching ? "Actualizando..." : "Actualizar"}
-        </AppButton>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <AppButton variant="outline" onClick={() => refetch()}>
+            {isFetching ? "Actualizando..." : "Actualizar"}
+          </AppButton>
+
+          <AppButton onClick={handleOpenCreateModal}>
+            Nuevo producto
+          </AppButton>
+        </div>
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
@@ -211,14 +315,12 @@ export function ProductsPage() {
         </div>
       ) : filteredProducts.length ? (
         <>
-          {/* Mobile / tablet cards */}
           <div className="mt-6 grid gap-4 lg:hidden">
             {paginatedProducts.map((product) => (
               <ProductMobileCard key={product.id} product={product} />
             ))}
           </div>
 
-          {/* Desktop table */}
           <div className="mt-6 hidden overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm lg:block">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-200">
@@ -311,6 +413,83 @@ export function ProductsPage() {
           </p>
         </div>
       )}
+
+      <AppModal
+        title="Nuevo producto"
+        description="Registra un producto nuevo para usarlo en los pedidos."
+        isOpen={isCreateModalOpen}
+        onClose={handleCloseCreateModal}
+      >
+        <form className="space-y-5" onSubmit={handleCreateProduct}>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <AppInput
+              label="SKU"
+              placeholder="Ej. PROD-001"
+              value={productForm.sku}
+              onChange={(event) => updateProductForm("sku", event.target.value)}
+            />
+
+            <AppInput
+              label="Nombre"
+              placeholder="Nombre del producto"
+              value={productForm.name}
+              onChange={(event) =>
+                updateProductForm("name", event.target.value)
+              }
+            />
+          </div>
+
+          <AppInput
+            label="Descripción"
+            placeholder="Descripción opcional"
+            value={productForm.description}
+            onChange={(event) =>
+              updateProductForm("description", event.target.value)
+            }
+          />
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <AppInput
+              label="Precio"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+              value={productForm.price}
+              onChange={(event) =>
+                updateProductForm("price", event.target.value)
+              }
+            />
+
+            <AppInput
+              label="Stock"
+              type="number"
+              min="0"
+              step="1"
+              placeholder="0"
+              value={productForm.stock}
+              onChange={(event) =>
+                updateProductForm("stock", event.target.value)
+              }
+            />
+          </div>
+
+          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+            <AppButton
+              type="button"
+              variant="outline"
+              onClick={handleCloseCreateModal}
+              disabled={isCreatingProduct}
+            >
+              Cancelar
+            </AppButton>
+
+            <AppButton type="submit" isLoading={isCreatingProduct}>
+              Guardar producto
+            </AppButton>
+          </div>
+        </form>
+      </AppModal>
     </AppLayout>
   );
 }
