@@ -4,6 +4,7 @@ import type {
   CreateProductRequest,
   Product,
   UpdateProductRequest,
+  UpdateProductStatusRequest,
 } from "../features/products/product.types";
 
 export const productsApi = api.injectEndpoints({
@@ -33,6 +34,20 @@ export const productsApi = api.injectEndpoints({
       }),
       invalidatesTags: ["Products", "Dashboard"],
     }),
+
+    updateProductStatus: builder.mutation<
+      ApiResponse<Product>,
+      UpdateProductStatusRequest
+    >({
+      query: ({ id, isActive }) => ({
+        url: `/products/${id}/status`,
+        method: "PATCH",
+        body: {
+          isActive,
+        },
+      }),
+      invalidatesTags: ["Products", "Dashboard"],
+    }),
   }),
 });
 
@@ -40,4 +55,5 @@ export const {
   useGetProductsQuery,
   useCreateProductMutation,
   useUpdateProductMutation,
+  useUpdateProductStatusMutation,
 } = productsApi;

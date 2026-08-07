@@ -9,6 +9,8 @@ import type { Product } from "../features/products/product.types";
 import {
   useCreateProductMutation,
   useGetProductsQuery,
+  useUpdateProductMutation,
+  useUpdateProductStatusMutation,
 } from "../services/productsApi";
 
 function formatMoney(value?: string | number | null) {
@@ -21,7 +23,43 @@ function normalizeSearchText(value: string) {
   return value.trim().toLowerCase();
 }
 
-function ProductMobileCard({ product }: { product: Product }) {
+type ProductFormState = {
+  sku: string;
+  name: string;
+  description: string;
+  price: string;
+  stock: string;
+};
+
+const initialProductForm: ProductFormState = {
+  sku: "",
+  name: "",
+  description: "",
+  price: "",
+  stock: "",
+};
+
+function getProductFormFromProduct(product: Product): ProductFormState {
+  return {
+    sku: product.sku,
+    name: product.name,
+    description: product.description ?? "",
+    price: String(product.price),
+    stock: String(product.stock),
+  };
+}
+
+function ProductMobileCard({
+  product,
+  onEdit,
+  onToggleStatus,
+  isUpdatingStatus,
+}: {
+  product: Product;
+  onEdit: (product: Product) => void;
+  onToggleStatus: (product: Product) => void;
+  isUpdatingStatus: boolean;
+}) {
   return (
     <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-4">
@@ -71,33 +109,34 @@ function ProductMobileCard({ product }: { product: Product }) {
           </p>
         </div>
       </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <AppButton variant="outline" onClick={() => onEdit(product)}>
+          Editar
+        </AppButton>
+
+        <AppButton
+          variant={product.isActive ? "danger" : "outline"}
+          disabled={isUpdatingStatus}
+          onClick={() => onToggleStatus(product)}
+        >
+          {product.isActive ? "Desactivar" : "Activar"}
+        </AppButton>
+      </div>
     </article>
   );
 }
-
-type ProductFormState = {
-  sku: string;
-  name: string;
-  description: string;
-  price: string;
-  stock: string;
-};
-
-const initialProductForm: ProductFormState = {
-  sku: "",
-  name: "",
-  description: "",
-  price: "",
-  stock: "",
-};
 
 export function ProductsPage() {
   const [searchText, setSearchText] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [productForm, setProductForm] =
     useState<ProductFormState>(initialProductForm);
+
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   const {
     data: productsResponse,
@@ -109,6 +148,12 @@ export function ProductsPage() {
 
   const [createProduct, { isLoading: isCreatingProduct }] =
     useCreateProductMutation();
+
+  const [updateProduct, { isLoading: isUpdatingProduct }] =
+    useUpdateProductMutation();
+
+  const [updateProductStatus, { isLoading: isUpdatingProductStatus }] =
+    useUpdateProductStatusMutation();
 
   const products = productsResponse?.data ?? [];
 
@@ -153,17 +198,35 @@ export function ProductsPage() {
   const activeProducts = products.filter((product) => product.isActive).length;
   const inactiveProducts = products.length - activeProducts;
 
+  const isSavingProduct = isCreatingProduct || isUpdatingProduct;
+  const isEditModalOpen = Boolean(editingProduct);
+
   function handleOpenCreateModal() {
     setProductForm(initialProductForm);
+    setEditingProduct(null);
     setIsCreateModalOpen(true);
   }
 
   function handleCloseCreateModal() {
-    if (isCreatingProduct) {
+    if (isSavingProduct) {
       return;
     }
 
     setIsCreateModalOpen(false);
+    setProductForm(initialProductForm);
+  }
+
+  function handleOpenEditModal(product: Product) {
+    setEditingProduct(product);
+    setProductForm(getProductFormFromProduct(product));
+  }
+
+  function handleCloseEditModal() {
+    if (isSavingProduct) {
+      return;
+    }
+
+    setEditingProduct(null);
     setProductForm(initialProductForm);
   }
 
@@ -174,11 +237,7 @@ export function ProductsPage() {
     }));
   }
 
-  async function handleCreateProduct(
-    event: React.FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault();
-
+  function validateProductForm() {
     const sku = productForm.sku.trim();
     const name = productForm.name.trim();
     const description = productForm.description.trim();
@@ -187,27 +246,41 @@ export function ProductsPage() {
 
     if (!sku || !name) {
       alert("SKU y nombre son obligatorios.");
-      return;
+      return null;
     }
 
     if (Number.isNaN(price) || price <= 0) {
       alert("El precio debe ser mayor a 0.");
-      return;
+      return null;
     }
 
     if (!Number.isInteger(stock) || stock < 0) {
       alert("El stock debe ser un número entero mayor o igual a 0.");
+      return null;
+    }
+
+    return {
+      sku,
+      name,
+      description: description || null,
+      price,
+      stock,
+    };
+  }
+
+  async function handleCreateProduct(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    const validatedData = validateProductForm();
+
+    if (!validatedData) {
       return;
     }
 
     try {
-      await createProduct({
-        sku,
-        name,
-        description: description || null,
-        price,
-        stock,
-      }).unwrap();
+      await createProduct(validatedData).unwrap();
 
       setIsCreateModalOpen(false);
       setProductForm(initialProductForm);
@@ -219,6 +292,71 @@ export function ProductsPage() {
         error?.data?.message ??
         error?.error ??
         "No se pudo crear el producto.";
+
+      alert(message);
+    }
+  }
+
+  async function handleUpdateProduct(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    if (!editingProduct) {
+      return;
+    }
+
+    const validatedData = validateProductForm();
+
+    if (!validatedData) {
+      return;
+    }
+
+    try {
+      await updateProduct({
+        id: editingProduct.id,
+        data: validatedData,
+      }).unwrap();
+
+      setEditingProduct(null);
+      setProductForm(initialProductForm);
+    } catch (error: any) {
+      console.log("UPDATE_PRODUCT_ERROR:", JSON.stringify(error, null, 2));
+
+      const message =
+        error?.data?.message ??
+        error?.error ??
+        "No se pudo actualizar el producto.";
+
+      alert(message);
+    }
+  }
+
+  async function handleToggleProductStatus(product: Product) {
+    const nextStatus = !product.isActive;
+
+    const confirmationMessage = nextStatus
+      ? `¿Seguro que quieres activar el producto "${product.name}"?`
+      : `¿Seguro que quieres desactivar el producto "${product.name}"?`;
+
+    const confirmed = confirm(confirmationMessage);
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await updateProductStatus({
+        id: product.id,
+        isActive: nextStatus,
+      }).unwrap();
+    } catch (error: any) {
+      console.log("UPDATE_PRODUCT_STATUS_ERROR:", JSON.stringify(error, null, 2));
+
+      const message =
+        error?.data?.message ??
+        error?.error ??
+        "No se pudo cambiar el estado del producto.";
 
       alert(message);
     }
@@ -317,7 +455,13 @@ export function ProductsPage() {
         <>
           <div className="mt-6 grid gap-4 lg:hidden">
             {paginatedProducts.map((product) => (
-              <ProductMobileCard key={product.id} product={product} />
+              <ProductMobileCard
+                key={product.id}
+                product={product}
+                onEdit={handleOpenEditModal}
+                onToggleStatus={handleToggleProductStatus}
+                isUpdatingStatus={isUpdatingProductStatus}
+              />
             ))}
           </div>
 
@@ -344,6 +488,10 @@ export function ProductsPage() {
 
                     <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-widest text-slate-500">
                       Estado
+                    </th>
+
+                    <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-widest text-slate-500">
+                      Acciones
                     </th>
                   </tr>
                 </thead>
@@ -383,6 +531,31 @@ export function ProductsPage() {
                         >
                           {product.isActive ? "Activo" : "Inactivo"}
                         </span>
+                      </td>
+
+                      <td className="whitespace-nowrap px-5 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(product)}
+                            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-950 transition hover:bg-slate-50"
+                          >
+                            Editar
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={isUpdatingProductStatus}
+                            onClick={() => handleToggleProductStatus(product)}
+                            className={`rounded-xl px-4 py-2 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                              product.isActive
+                                ? "bg-red-600 text-white hover:bg-red-700"
+                                : "border border-slate-300 bg-white text-slate-950 hover:bg-slate-50"
+                            }`}
+                          >
+                            {product.isActive ? "Desactivar" : "Activar"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -479,13 +652,90 @@ export function ProductsPage() {
               type="button"
               variant="outline"
               onClick={handleCloseCreateModal}
-              disabled={isCreatingProduct}
+              disabled={isSavingProduct}
             >
               Cancelar
             </AppButton>
 
             <AppButton type="submit" isLoading={isCreatingProduct}>
               Guardar producto
+            </AppButton>
+          </div>
+        </form>
+      </AppModal>
+
+      <AppModal
+        title="Editar producto"
+        description="Actualiza los datos del producto seleccionado."
+        isOpen={isEditModalOpen}
+        onClose={handleCloseEditModal}
+      >
+        <form className="space-y-5" onSubmit={handleUpdateProduct}>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <AppInput
+              label="SKU"
+              placeholder="Ej. PROD-001"
+              value={productForm.sku}
+              onChange={(event) => updateProductForm("sku", event.target.value)}
+            />
+
+            <AppInput
+              label="Nombre"
+              placeholder="Nombre del producto"
+              value={productForm.name}
+              onChange={(event) =>
+                updateProductForm("name", event.target.value)
+              }
+            />
+          </div>
+
+          <AppInput
+            label="Descripción"
+            placeholder="Descripción opcional"
+            value={productForm.description}
+            onChange={(event) =>
+              updateProductForm("description", event.target.value)
+            }
+          />
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <AppInput
+              label="Precio"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+              value={productForm.price}
+              onChange={(event) =>
+                updateProductForm("price", event.target.value)
+              }
+            />
+
+            <AppInput
+              label="Stock"
+              type="number"
+              min="0"
+              step="1"
+              placeholder="0"
+              value={productForm.stock}
+              onChange={(event) =>
+                updateProductForm("stock", event.target.value)
+              }
+            />
+          </div>
+
+          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+            <AppButton
+              type="button"
+              variant="outline"
+              onClick={handleCloseEditModal}
+              disabled={isSavingProduct}
+            >
+              Cancelar
+            </AppButton>
+
+            <AppButton type="submit" isLoading={isUpdatingProduct}>
+              Guardar cambios
             </AppButton>
           </div>
         </form>

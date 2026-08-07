@@ -29,6 +29,11 @@ export type UpdateProductRequest = {
   };
 };
 
+export type UpdateProductStatusRequest = {
+  id: number;
+  isActive: boolean;
+};
+
 export type ApiResponse<T> = {
   success: boolean;
   message: string;
