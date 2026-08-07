@@ -18,6 +18,17 @@ export type CreateProductRequest = {
   stock: number;
 };
 
+export type UpdateProductRequest = {
+  id: number;
+  data: {
+    sku: string;
+    name: string;
+    description?: string | null;
+    price: number;
+    stock: number;
+  };
+};
+
 export type ApiResponse<T> = {
   success: boolean;
   message: string;

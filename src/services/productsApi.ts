@@ -3,6 +3,7 @@ import type {
   ApiResponse,
   CreateProductRequest,
   Product,
+  UpdateProductRequest,
 } from "../features/products/product.types";
 
 export const productsApi = api.injectEndpoints({
@@ -23,7 +24,20 @@ export const productsApi = api.injectEndpoints({
       }),
       invalidatesTags: ["Products", "Dashboard"],
     }),
+
+    updateProduct: builder.mutation<ApiResponse<Product>, UpdateProductRequest>({
+      query: ({ id, data }) => ({
+        url: `/products/${id}`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: ["Products", "Dashboard"],
+    }),
   }),
 });
 
-export const { useGetProductsQuery, useCreateProductMutation } = productsApi;
+export const {
+  useGetProductsQuery,
+  useCreateProductMutation,
+  useUpdateProductMutation,
+} = productsApi;
