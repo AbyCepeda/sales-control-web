@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { AppLayout } from "../components/layout/AppLayout";
 import { AppButton } from "../components/ui/AppButton";
 import { AppInput } from "../components/ui/AppInput";
@@ -199,8 +200,15 @@ function OrderMobileCard({ order }: { order: Order }) {
         className="mt-5 w-full"
         onClick={() => setIsExpanded((current) => !current)}
       >
-        {isExpanded ? "Ocultar detalle" : "Ver detalle"}
+        {isExpanded ? "Ocultar detalle rápido" : "Ver detalle rápido"}
       </AppButton>
+
+      <Link
+        to={`/orders/${order.id}`}
+        className="mt-3 flex w-full justify-center rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+      >
+        Abrir pantalla de detalle
+      </Link>
 
       {isExpanded ? (
         <div className="mt-5 space-y-4">
@@ -372,10 +380,10 @@ function OrderExpandedRow({ order }: { order: Order }) {
 
   return (
     <tr>
-      <td colSpan={8} className="bg-slate-50 px-6 py-5">
+      <td colSpan={9} className="bg-slate-50 px-6 py-5">
         <div className="rounded-3xl border border-slate-200 bg-white p-5">
           <h3 className="text-lg font-extrabold text-slate-950">
-            Detalle del pedido #{order.id}
+            Detalle rápido del pedido #{order.id}
           </h3>
 
           <p className="mt-1 text-sm text-slate-500">
@@ -708,7 +716,7 @@ export function OrdersPage() {
           </h2>
 
           <p className="mt-2 text-sm text-slate-500">
-            Tabla desplegable para revisar clientes, artículos y abonos.
+            Consulta pedidos, pagos y abre una pantalla completa de detalle.
           </p>
         </div>
 
@@ -831,6 +839,10 @@ export function OrdersPage() {
                     <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-widest text-slate-500">
                       Estado
                     </th>
+
+                    <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-widest text-slate-500">
+                      Acción
+                    </th>
                   </tr>
                 </thead>
 
@@ -913,6 +925,15 @@ export function OrdersPage() {
                             >
                               {getStatusLabel(order.status)}
                             </span>
+                          </td>
+
+                          <td className="whitespace-nowrap px-5 py-4 text-right">
+                            <Link
+                              to={`/orders/${order.id}`}
+                              className="inline-flex rounded-xl bg-slate-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
+                            >
+                              Ver detalle
+                            </Link>
                           </td>
                         </tr>
 

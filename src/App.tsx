@@ -3,6 +3,7 @@ import { PrivateRoute } from "./components/layout/PrivateRoute";
 import { CustomersPage } from "./pages/CustomersPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
+import { OrderDetailPage } from "./pages/OrderDetailPage";
 import { OrdersPage } from "./pages/OrdersPage";
 import { ProductsPage } from "./pages/ProductsPage";
 import { UsersPage } from "./pages/UsersPage";
@@ -27,6 +28,15 @@ export default function App() {
         element={
           <PrivateRoute>
             <OrdersPage />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/orders/:id"
+        element={
+          <PrivateRoute>
+            <OrderDetailPage />
           </PrivateRoute>
         }
       />
