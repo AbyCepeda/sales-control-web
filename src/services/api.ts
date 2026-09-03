@@ -5,8 +5,6 @@ const baseUrl =
   import.meta.env.VITE_API_BASE_URL ??
   "https://sales-control-api-eta.vercel.app/api";
 
-console.log("API BASE URL:", baseUrl);
-
 export const api = createApi({
   reducerPath: "api",
   baseQuery: fetchBaseQuery({
