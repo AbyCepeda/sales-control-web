@@ -82,14 +82,14 @@ export type Order = {
   customerOrders: CustomerOrder[];
 };
 
-export type ApiResponse<T> = {
-  success: boolean;
-  message: string;
-  data: T;
-};
-
 export type CreateCustomerOrderPaymentRequest = {
   amount: number;
   method: PaymentMethod;
   notes?: string | null;
+};
+
+export type ApiResponse<T> = {
+  success: boolean;
+  message: string;
+  data: T;
 };

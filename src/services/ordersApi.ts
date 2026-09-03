@@ -43,6 +43,20 @@ export const ordersApi = api.injectEndpoints({
           : ["Orders", "Dashboard"];
       },
     }),
+
+    deleteCustomerOrderPayment: builder.mutation<ApiResponse<Order>, number>({
+      query: (paymentId) => ({
+        url: `/customer-order-payments/${paymentId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result) => {
+        const orderId = result?.data?.id;
+
+        return orderId
+          ? ["Orders", { type: "Orders", id: orderId }, "Dashboard"]
+          : ["Orders", "Dashboard"];
+      },
+    }),
   }),
 });
 
@@ -50,4 +64,5 @@ export const {
   useGetOrdersQuery,
   useGetOrderByIdQuery,
   useCreateCustomerOrderPaymentMutation,
+  useDeleteCustomerOrderPaymentMutation,
 } = ordersApi;

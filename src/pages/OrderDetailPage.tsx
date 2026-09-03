@@ -19,6 +19,7 @@ import type {
 } from "../features/orders/order.types";
 import {
   useCreateCustomerOrderPaymentMutation,
+  useDeleteCustomerOrderPaymentMutation,
   useGetOrderByIdQuery,
 } from "../services/ordersApi";
 
@@ -57,6 +58,17 @@ function getStatusClassName(status: OrderStatus) {
   };
 
   return classes[status];
+}
+
+function getPaymentMethodLabel(method: string) {
+  const labels: Record<string, string> = {
+    CASH: "Efectivo",
+    TRANSFER: "Transferencia",
+    CARD: "Tarjeta",
+    OTHER: "Otro",
+  };
+
+  return labels[method] ?? method;
 }
 
 function getCustomerPaidAmount(customerOrder: CustomerOrder) {
@@ -275,12 +287,115 @@ function RegisterPaymentModal({
   );
 }
 
+function PaymentList({
+  customerOrder,
+  isDeletingPayment,
+  onDeletePayment,
+}: {
+  customerOrder: CustomerOrder;
+  isDeletingPayment: boolean;
+  onDeletePayment: (paymentId: number) => void;
+}) {
+  if (!customerOrder.payments.length) {
+    return (
+      <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+        <p className="text-sm font-bold text-slate-700">
+          Sin abonos registrados
+        </p>
+
+        <p className="mt-1 text-sm text-slate-500">
+          Cuando registres un abono aparecerá aquí.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="border-b border-slate-200 bg-slate-100 p-4">
+        <h4 className="font-extrabold text-slate-950">
+          Abonos registrados ({customerOrder.payments.length})
+        </h4>
+
+        <p className="mt-1 text-sm text-slate-500">
+          Aquí puedes revisar o eliminar pagos capturados por error.
+        </p>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-slate-200">
+          <thead className="bg-white">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
+                Fecha
+              </th>
+
+              <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
+                Método
+              </th>
+
+              <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
+                Notas
+              </th>
+
+              <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
+                Monto
+              </th>
+
+              <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
+                Acción
+              </th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-slate-100">
+            {customerOrder.payments.map((payment) => (
+              <tr key={payment.id}>
+                <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600">
+                  {formatDate(payment.createdAt)}
+                </td>
+
+                <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-slate-700">
+                  {getPaymentMethodLabel(payment.method)}
+                </td>
+
+                <td className="px-4 py-3 text-sm text-slate-600">
+                  {payment.notes ?? "Sin notas"}
+                </td>
+
+                <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-extrabold text-emerald-700">
+                  {formatMoney(payment.amount)}
+                </td>
+
+                <td className="whitespace-nowrap px-4 py-3 text-right">
+                  <button
+                    type="button"
+                    disabled={isDeletingPayment}
+                    onClick={() => onDeletePayment(payment.id)}
+                    className="rounded-xl bg-red-50 px-4 py-2 text-sm font-bold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Eliminar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function CustomerMobileCard({
   customerOrder,
   onRegisterPayment,
+  isDeletingPayment,
+  onDeletePayment,
 }: {
   customerOrder: CustomerOrder;
   onRegisterPayment: (customerOrder: CustomerOrder) => void;
+  isDeletingPayment: boolean;
+  onDeletePayment: (paymentId: number) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentItemPage, setCurrentItemPage] = useState(1);
@@ -368,6 +483,12 @@ function CustomerMobileCard({
         </AppButton>
       </div>
 
+      <PaymentList
+        customerOrder={customerOrder}
+        isDeletingPayment={isDeletingPayment}
+        onDeletePayment={onDeletePayment}
+      />
+
       {isExpanded ? (
         <div className="mt-5">
           <div className="space-y-3">
@@ -451,9 +572,13 @@ function CustomerMobileCard({
 function CustomerOrderRows({
   customerOrder,
   onRegisterPayment,
+  isDeletingPayment,
+  onDeletePayment,
 }: {
   customerOrder: CustomerOrder;
   onRegisterPayment: (customerOrder: CustomerOrder) => void;
+  isDeletingPayment: boolean;
+  onDeletePayment: (paymentId: number) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentItemPage, setCurrentItemPage] = useState(1);
@@ -632,6 +757,14 @@ function CustomerOrderRows({
                   />
                 </div>
               ) : null}
+
+              <div className="p-4">
+                <PaymentList
+                  customerOrder={customerOrder}
+                  isDeletingPayment={isDeletingPayment}
+                  onDeletePayment={onDeletePayment}
+                />
+              </div>
             </div>
           </td>
         </tr>
@@ -652,6 +785,9 @@ export function OrderDetailPage() {
 
   const [createPayment, { isLoading: isCreatingPayment }] =
     useCreateCustomerOrderPaymentMutation();
+
+  const [deletePayment, { isLoading: isDeletingPayment }] =
+    useDeleteCustomerOrderPaymentMutation();
 
   const {
     data: orderResponse,
@@ -718,6 +854,27 @@ export function OrderDetailPage() {
         error?.data?.message ??
         error?.error ??
         "No se pudo registrar el abono.";
+
+      alert(message);
+    }
+  }
+
+  async function handleDeletePayment(paymentId: number) {
+    const confirmDelete = window.confirm(
+      "¿Seguro que quieres eliminar este abono? Esta acción recalculará el pago del cliente.",
+    );
+
+    if (!confirmDelete) {
+      return;
+    }
+
+    try {
+      await deletePayment(paymentId).unwrap();
+    } catch (error: any) {
+      const message =
+        error?.data?.message ??
+        error?.error ??
+        "No se pudo eliminar el abono.";
 
       alert(message);
     }
@@ -888,7 +1045,8 @@ export function OrderDetailPage() {
 
               <p className="mt-1 text-sm text-slate-500">
                 Clientes paginados. Cada cliente puede desplegar su subtabla de
-                artículos y registrar abonos.
+                artículos, registrar abonos y eliminar pagos capturados por
+                error.
               </p>
             </div>
 
@@ -898,6 +1056,8 @@ export function OrderDetailPage() {
                   key={customerOrder.id}
                   customerOrder={customerOrder}
                   onRegisterPayment={openPaymentModal}
+                  isDeletingPayment={isDeletingPayment}
+                  onDeletePayment={handleDeletePayment}
                 />
               ))}
             </div>
@@ -945,6 +1105,8 @@ export function OrderDetailPage() {
                         key={customerOrder.id}
                         customerOrder={customerOrder}
                         onRegisterPayment={openPaymentModal}
+                        isDeletingPayment={isDeletingPayment}
+                        onDeletePayment={handleDeletePayment}
                       />
                     ))}
                   </tbody>
