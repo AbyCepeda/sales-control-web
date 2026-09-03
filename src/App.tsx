@@ -7,6 +7,7 @@ import { OrderDetailPage } from "./pages/OrderDetailPage";
 import { OrdersPage } from "./pages/OrdersPage";
 import { ProductsPage } from "./pages/ProductsPage";
 import { UsersPage } from "./pages/UsersPage";
+import { CreateOrderPage } from "./pages/CreateOrderPage";
 
 export default function App() {
   return (
@@ -28,6 +29,15 @@ export default function App() {
         element={
           <PrivateRoute>
             <OrdersPage />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/orders/new"
+        element={
+          <PrivateRoute>
+            <CreateOrderPage />
           </PrivateRoute>
         }
       />

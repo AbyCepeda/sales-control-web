@@ -2,6 +2,7 @@ import { api } from "./api";
 import type {
   ApiResponse,
   CreateCustomerOrderPaymentRequest,
+  CreateOrderRequest,
   Order,
 } from "../features/orders/order.types";
 
@@ -21,6 +22,15 @@ export const ordersApi = api.injectEndpoints({
         method: "GET",
       }),
       providesTags: (_result, _error, id) => [{ type: "Orders", id }],
+    }),
+
+    createOrder: builder.mutation<ApiResponse<Order>, CreateOrderRequest>({
+      query: (body) => ({
+        url: "/orders",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Orders", "Products", "Dashboard", "Customers"],
     }),
 
     createCustomerOrderPayment: builder.mutation<
@@ -63,6 +73,7 @@ export const ordersApi = api.injectEndpoints({
 export const {
   useGetOrdersQuery,
   useGetOrderByIdQuery,
+  useCreateOrderMutation,
   useCreateCustomerOrderPaymentMutation,
   useDeleteCustomerOrderPaymentMutation,
 } = ordersApi;

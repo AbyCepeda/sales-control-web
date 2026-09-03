@@ -566,7 +566,9 @@ function OrderExpandedRow({ order }: { order: Order }) {
                         total={customerOrder.payments.length}
                         visibleCount={SUBTABLE_INITIAL_LIMIT}
                         isExpanded={arePaymentsExpanded}
-                        onToggle={() => toggleCustomerPayments(customerOrder.id)}
+                        onToggle={() =>
+                          toggleCustomerPayments(customerOrder.id)
+                        }
                         label="abonos"
                       />
                     </div>
@@ -720,9 +722,18 @@ export function OrdersPage() {
           </p>
         </div>
 
-        <AppButton variant="outline" onClick={() => refetch()}>
-          {isFetching ? "Actualizando..." : "Actualizar"}
-        </AppButton>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Link
+            to="/orders/new"
+            className="rounded-xl bg-slate-950 px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-slate-800"
+          >
+            Nuevo pedido
+          </Link>
+
+          <AppButton variant="outline" onClick={() => refetch()}>
+            {isFetching ? "Actualizando..." : "Actualizar"}
+          </AppButton>
+        </div>
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">

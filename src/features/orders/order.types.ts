@@ -88,6 +88,28 @@ export type CreateCustomerOrderPaymentRequest = {
   notes?: string | null;
 };
 
+export type CreateOrderItemRequest = {
+  sku: string;
+  name: string;
+  description?: string | null;
+  quantity: number;
+  unitPrice: number;
+  isPaid?: boolean;
+};
+
+export type CreateOrderCustomerRequest = {
+  name: string;
+  phone?: string | null;
+  notes?: string | null;
+  items: CreateOrderItemRequest[];
+};
+
+export type CreateOrderRequest = {
+  deliveryDate?: string | null;
+  notes?: string | null;
+  customers: CreateOrderCustomerRequest[];
+};
+
 export type ApiResponse<T> = {
   success: boolean;
   message: string;
