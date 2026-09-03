@@ -87,3 +87,9 @@ export type ApiResponse<T> = {
   message: string;
   data: T;
 };
+
+export type CreateCustomerOrderPaymentRequest = {
+  amount: number;
+  method: PaymentMethod;
+  notes?: string | null;
+};

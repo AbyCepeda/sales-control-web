@@ -1,14 +1,26 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
 import { Link, useParams } from "react-router-dom";
 import { AppLayout } from "../components/layout/AppLayout";
 import { AppButton } from "../components/ui/AppButton";
+import { AppInput } from "../components/ui/AppInput";
+import { AppModal } from "../components/ui/AppModal";
 import { Pagination } from "../components/ui/Pagination";
 import type {
   CustomerOrder,
   OrderItem,
   OrderStatus,
+  PaymentMethod,
 } from "../features/orders/order.types";
-import { useGetOrderByIdQuery } from "../services/ordersApi";
+import {
+  useCreateCustomerOrderPaymentMutation,
+  useGetOrderByIdQuery,
+} from "../services/ordersApi";
 
 function formatMoney(value?: string | number | null) {
   const amount = Number(value ?? 0);
@@ -139,6 +151,7 @@ function DetailMetricCard({
   return (
     <article className={`rounded-3xl p-5 shadow-sm ${variantClassName}`}>
       <p className={`text-sm font-semibold ${titleClassName}`}>{title}</p>
+
       <p className={`mt-2 text-2xl font-extrabold ${valueClassName}`}>
         {value}
       </p>
@@ -146,10 +159,128 @@ function DetailMetricCard({
   );
 }
 
+function RegisterPaymentModal({
+  isOpen,
+  customerOrder,
+  isLoading,
+  onClose,
+  onSubmit,
+}: {
+  isOpen: boolean;
+  customerOrder: CustomerOrder | null;
+  isLoading: boolean;
+  onClose: () => void;
+  onSubmit: (data: {
+    amount: number;
+    method: PaymentMethod;
+    notes: string | null;
+  }) => void;
+}) {
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState<PaymentMethod>("CASH");
+  const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      setAmount("");
+      setMethod("CASH");
+      setNotes("");
+    }
+  }, [isOpen, customerOrder?.id]);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const parsedAmount = Number(amount);
+
+    if (!parsedAmount || parsedAmount <= 0) {
+      alert("Ingresa un monto válido.");
+      return;
+    }
+
+    onSubmit({
+      amount: parsedAmount,
+      method,
+      notes: notes.trim() || null,
+    });
+  }
+
+  const pending = customerOrder ? getCustomerPendingAmount(customerOrder) : 0;
+
+  return (
+    <AppModal
+      title="Registrar abono"
+      description={
+        customerOrder
+          ? `Cliente: ${customerOrder.customer.name} · Pendiente: ${formatMoney(
+              pending,
+            )}`
+          : "Registra un pago para el cliente seleccionado."
+      }
+      isOpen={isOpen}
+      onClose={onClose}
+    >
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        <AppInput
+          label="Monto"
+          type="number"
+          min="1"
+          step="0.01"
+          placeholder="Ejemplo: 250"
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+        />
+
+        <label className="block">
+          <span className="mb-2 block text-sm font-bold text-slate-700">
+            Método de pago
+          </span>
+
+          <select
+            value={method}
+            onChange={(event) => setMethod(event.target.value as PaymentMethod)}
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-950 outline-none transition focus:border-slate-950"
+          >
+            <option value="CASH">Efectivo</option>
+            <option value="TRANSFER">Transferencia</option>
+            <option value="CARD">Tarjeta</option>
+            <option value="OTHER">Otro</option>
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="mb-2 block text-sm font-bold text-slate-700">
+            Notas
+          </span>
+
+          <textarea
+            placeholder="Ejemplo: Abono inicial, transferencia confirmada, etc."
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            className="min-h-28 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-950"
+          />
+        </label>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <AppButton type="button" variant="outline" onClick={onClose}>
+            Cancelar
+          </AppButton>
+
+          <AppButton type="submit" isLoading={isLoading}>
+            Guardar abono
+          </AppButton>
+        </div>
+      </form>
+    </AppModal>
+  );
+}
+
 function CustomerMobileCard({
   customerOrder,
+  onRegisterPayment,
 }: {
   customerOrder: CustomerOrder;
+  onRegisterPayment: (customerOrder: CustomerOrder) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentItemPage, setCurrentItemPage] = useState(1);
@@ -220,13 +351,22 @@ function CustomerMobileCard({
         </div>
       </div>
 
-      <AppButton
-        variant="outline"
-        className="mt-5 w-full"
-        onClick={() => setIsExpanded((current) => !current)}
-      >
-        {isExpanded ? "Ocultar artículos" : "Ver artículos"}
-      </AppButton>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <AppButton
+          variant="outline"
+          className="w-full"
+          onClick={() => setIsExpanded((current) => !current)}
+        >
+          {isExpanded ? "Ocultar artículos" : "Ver artículos"}
+        </AppButton>
+
+        <AppButton
+          className="w-full"
+          onClick={() => onRegisterPayment(customerOrder)}
+        >
+          Registrar abono
+        </AppButton>
+      </div>
 
       {isExpanded ? (
         <div className="mt-5">
@@ -262,6 +402,7 @@ function CustomerMobileCard({
                       <p className="text-xs font-bold text-slate-500">
                         Cantidad
                       </p>
+
                       <p className="font-bold text-slate-950">
                         {item.quantity}
                       </p>
@@ -269,6 +410,7 @@ function CustomerMobileCard({
 
                     <div>
                       <p className="text-xs font-bold text-slate-500">Precio</p>
+
                       <p className="font-bold text-slate-950">
                         {formatMoney(item.unitPriceSnapshot)}
                       </p>
@@ -278,6 +420,7 @@ function CustomerMobileCard({
                       <p className="text-xs font-bold text-slate-500">
                         Subtotal
                       </p>
+
                       <p className="font-bold text-slate-950">
                         {formatMoney(item.subtotal)}
                       </p>
@@ -307,8 +450,10 @@ function CustomerMobileCard({
 
 function CustomerOrderRows({
   customerOrder,
+  onRegisterPayment,
 }: {
   customerOrder: CustomerOrder;
+  onRegisterPayment: (customerOrder: CustomerOrder) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentItemPage, setCurrentItemPage] = useState(1);
@@ -376,11 +521,17 @@ function CustomerOrderRows({
             {paymentStatus.label}
           </span>
         </td>
+
+        <td className="whitespace-nowrap px-5 py-4 text-right">
+          <AppButton onClick={() => onRegisterPayment(customerOrder)}>
+            Registrar abono
+          </AppButton>
+        </td>
       </tr>
 
       {isExpanded ? (
         <tr>
-          <td colSpan={7} className="bg-slate-50 px-6 py-5">
+          <td colSpan={8} className="bg-slate-50 px-6 py-5">
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
               <div className="border-b border-slate-200 bg-slate-100 p-4">
                 <h4 className="font-extrabold text-slate-950">
@@ -496,6 +647,11 @@ export function OrderDetailPage() {
 
   const [currentCustomerPage, setCurrentCustomerPage] = useState(1);
   const [customerPageSize, setCustomerPageSize] = useState(5);
+  const [selectedCustomerOrder, setSelectedCustomerOrder] =
+    useState<CustomerOrder | null>(null);
+
+  const [createPayment, { isLoading: isCreatingPayment }] =
+    useCreateCustomerOrderPaymentMutation();
 
   const {
     data: orderResponse,
@@ -533,6 +689,40 @@ export function OrderDetailPage() {
       return total + customerOrder.items.length;
     }, 0) ?? 0;
 
+  function openPaymentModal(customerOrder: CustomerOrder) {
+    setSelectedCustomerOrder(customerOrder);
+  }
+
+  function closePaymentModal() {
+    setSelectedCustomerOrder(null);
+  }
+
+  async function handleCreatePayment(data: {
+    amount: number;
+    method: PaymentMethod;
+    notes: string | null;
+  }) {
+    if (!selectedCustomerOrder) {
+      return;
+    }
+
+    try {
+      await createPayment({
+        customerOrderId: selectedCustomerOrder.id,
+        body: data,
+      }).unwrap();
+
+      closePaymentModal();
+    } catch (error: any) {
+      const message =
+        error?.data?.message ??
+        error?.error ??
+        "No se pudo registrar el abono.";
+
+      alert(message);
+    }
+  }
+
   if (Number.isNaN(orderId)) {
     return (
       <AppLayout>
@@ -568,7 +758,7 @@ export function OrderDetailPage() {
           </h2>
 
           <p className="mt-2 text-sm text-slate-500">
-            Detalle de clientes, artículos y estado de pago.
+            Detalle de clientes, artículos, pagos y estado de cobro.
           </p>
         </div>
 
@@ -580,6 +770,7 @@ export function OrderDetailPage() {
       {isLoading ? (
         <div className="mt-6 rounded-3xl bg-white p-8 text-center shadow-sm">
           <p className="font-bold text-slate-950">Cargando pedido...</p>
+
           <p className="mt-2 text-sm text-slate-500">
             Estamos consultando la API.
           </p>
@@ -697,7 +888,7 @@ export function OrderDetailPage() {
 
               <p className="mt-1 text-sm text-slate-500">
                 Clientes paginados. Cada cliente puede desplegar su subtabla de
-                artículos.
+                artículos y registrar abonos.
               </p>
             </div>
 
@@ -706,6 +897,7 @@ export function OrderDetailPage() {
                 <CustomerMobileCard
                   key={customerOrder.id}
                   customerOrder={customerOrder}
+                  onRegisterPayment={openPaymentModal}
                 />
               ))}
             </div>
@@ -740,6 +932,10 @@ export function OrderDetailPage() {
                       <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-widest text-slate-500">
                         Estado de pago
                       </th>
+
+                      <th className="px-5 py-4 text-right text-xs font-black uppercase tracking-widest text-slate-500">
+                        Acción
+                      </th>
                     </tr>
                   </thead>
 
@@ -748,6 +944,7 @@ export function OrderDetailPage() {
                       <CustomerOrderRows
                         key={customerOrder.id}
                         customerOrder={customerOrder}
+                        onRegisterPayment={openPaymentModal}
                       />
                     ))}
                   </tbody>
@@ -769,6 +966,14 @@ export function OrderDetailPage() {
           </section>
         </>
       )}
+
+      <RegisterPaymentModal
+        isOpen={Boolean(selectedCustomerOrder)}
+        customerOrder={selectedCustomerOrder}
+        isLoading={isCreatingPayment}
+        onClose={closePaymentModal}
+        onSubmit={handleCreatePayment}
+      />
     </AppLayout>
   );
 }
