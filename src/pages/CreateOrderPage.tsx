@@ -3,14 +3,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { AppLayout } from "../components/layout/AppLayout";
 import { AppButton } from "../components/ui/AppButton";
 import { AppInput } from "../components/ui/AppInput";
-import type { Product } from "../features/products/product.types";
 import type {
   CreateOrderCustomerRequest,
   CreateOrderItemRequest,
   CreateOrderRequest,
 } from "../features/orders/order.types";
-import { useGetProductsQuery } from "../services/productsApi";
+import type { Product } from "../features/products/product.types";
 import { useCreateOrderMutation } from "../services/ordersApi";
+import { useGetProductsQuery } from "../services/productsApi";
 
 type OrderItemForm = {
   productId: string;
@@ -73,18 +73,9 @@ function getOrderTotal(customers: OrderCustomerForm[]) {
   }, 0);
 }
 
-function convertDateToIso(date: string) {
-  if (!date) {
-    return null;
-  }
-
-  return new Date(`${date}T00:00:00`).toISOString();
-}
-
 export function CreateOrderPage() {
   const navigate = useNavigate();
 
-  const [deliveryDate, setDeliveryDate] = useState("");
   const [notes, setNotes] = useState("");
   const [customers, setCustomers] = useState<OrderCustomerForm[]>([
     createEmptyCustomer(),
@@ -275,14 +266,18 @@ export function CreateOrderPage() {
       for (const [itemIndex, item] of customer.items.entries()) {
         if (!item.sku.trim()) {
           alert(
-            `El artículo ${itemIndex + 1} del cliente ${customer.name} necesita SKU.`,
+            `El artículo ${itemIndex + 1} del cliente ${
+              customer.name
+            } necesita SKU.`,
           );
           return false;
         }
 
         if (!item.name.trim()) {
           alert(
-            `El artículo ${itemIndex + 1} del cliente ${customer.name} necesita nombre.`,
+            `El artículo ${itemIndex + 1} del cliente ${
+              customer.name
+            } necesita nombre.`,
           );
           return false;
         }
@@ -330,7 +325,7 @@ export function CreateOrderPage() {
     );
 
     return {
-      deliveryDate: convertDateToIso(deliveryDate),
+      deliveryDate: null,
       notes: notes.trim() || null,
       customers: customersPayload,
     };
@@ -396,15 +391,8 @@ export function CreateOrderPage() {
               Información general
             </h3>
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <AppInput
-                label="Fecha de entrega"
-                type="date"
-                value={deliveryDate}
-                onChange={(event) => setDeliveryDate(event.target.value)}
-              />
-
-              <label className="block sm:col-span-2">
+            <div className="mt-5 grid gap-4">
+              <label className="block">
                 <span className="mb-2 block text-sm font-bold text-slate-700">
                   Notas del pedido
                 </span>
@@ -437,6 +425,10 @@ export function CreateOrderPage() {
               {customers.reduce((total, customer) => {
                 return total + customer.items.length;
               }, 0)}
+            </p>
+
+            <p className="mt-4 text-xs text-slate-500">
+              La fecha del pedido se registra automáticamente al guardar.
             </p>
           </div>
         </div>
