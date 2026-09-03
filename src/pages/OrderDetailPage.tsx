@@ -1,7 +1,8 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AppLayout } from "../components/layout/AppLayout";
 import { AppButton } from "../components/ui/AppButton";
+import { Pagination } from "../components/ui/Pagination";
 import type {
   CustomerOrder,
   OrderItem,
@@ -53,7 +54,10 @@ function getCustomerPaidAmount(customerOrder: CustomerOrder) {
 }
 
 function getCustomerPendingAmount(customerOrder: CustomerOrder) {
-  return Math.max(Number(customerOrder.total) - getCustomerPaidAmount(customerOrder), 0);
+  return Math.max(
+    Number(customerOrder.total) - getCustomerPaidAmount(customerOrder),
+    0,
+  );
 }
 
 function getCustomerPaymentStatus(customerOrder: CustomerOrder) {
@@ -94,6 +98,13 @@ function getItemPaymentStatus(item: OrderItem) {
   };
 }
 
+function getPaginatedData<T>(items: T[], currentPage: number, pageSize: number) {
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+
+  return items.slice(startIndex, endIndex);
+}
+
 function DetailMetricCard({
   title,
   value,
@@ -111,7 +122,8 @@ function DetailMetricCard({
     danger: "bg-red-50 border border-red-200",
   }[variant];
 
-  const titleClassName = variant === "dark" ? "text-slate-400" : "text-slate-500";
+  const titleClassName =
+    variant === "dark" ? "text-slate-400" : "text-slate-500";
 
   const valueClassName =
     variant === "dark"
@@ -127,17 +139,37 @@ function DetailMetricCard({
   return (
     <article className={`rounded-3xl p-5 shadow-sm ${variantClassName}`}>
       <p className={`text-sm font-semibold ${titleClassName}`}>{title}</p>
-      <p className={`mt-2 text-2xl font-extrabold ${valueClassName}`}>{value}</p>
+      <p className={`mt-2 text-2xl font-extrabold ${valueClassName}`}>
+        {value}
+      </p>
     </article>
   );
 }
 
-function CustomerMobileCard({ customerOrder }: { customerOrder: CustomerOrder }) {
+function CustomerMobileCard({
+  customerOrder,
+}: {
+  customerOrder: CustomerOrder;
+}) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [currentItemPage, setCurrentItemPage] = useState(1);
+  const [itemPageSize, setItemPageSize] = useState(10);
 
   const paid = getCustomerPaidAmount(customerOrder);
   const pending = getCustomerPendingAmount(customerOrder);
   const paymentStatus = getCustomerPaymentStatus(customerOrder);
+
+  const paginatedItems = useMemo(() => {
+    return getPaginatedData(
+      customerOrder.items,
+      currentItemPage,
+      itemPageSize,
+    );
+  }, [customerOrder.items, currentItemPage, itemPageSize]);
+
+  useEffect(() => {
+    setCurrentItemPage(1);
+  }, [itemPageSize]);
 
   return (
     <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -197,59 +229,263 @@ function CustomerMobileCard({ customerOrder }: { customerOrder: CustomerOrder })
       </AppButton>
 
       {isExpanded ? (
-        <div className="mt-5 space-y-3">
-          {customerOrder.items.map((item) => {
-            const itemStatus = getItemPaymentStatus(item);
+        <div className="mt-5">
+          <div className="space-y-3">
+            {paginatedItems.map((item) => {
+              const itemStatus = getItemPaymentStatus(item);
 
-            return (
-              <div
-                key={item.id}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-extrabold text-slate-950">
-                      {item.nameSnapshot}
-                    </p>
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-extrabold text-slate-950">
+                        {item.nameSnapshot}
+                      </p>
 
-                    <p className="mt-1 text-sm text-slate-500">
-                      SKU {item.skuSnapshot}
-                    </p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        SKU {item.skuSnapshot}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${itemStatus.className}`}
+                    >
+                      {itemStatus.label}
+                    </span>
                   </div>
 
-                  <span
-                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${itemStatus.className}`}
-                  >
-                    {itemStatus.label}
-                  </span>
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
+                    <div>
+                      <p className="text-xs font-bold text-slate-500">
+                        Cantidad
+                      </p>
+                      <p className="font-bold text-slate-950">
+                        {item.quantity}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-bold text-slate-500">Precio</p>
+                      <p className="font-bold text-slate-950">
+                        {formatMoney(item.unitPriceSnapshot)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-bold text-slate-500">
+                        Subtotal
+                      </p>
+                      <p className="font-bold text-slate-950">
+                        {formatMoney(item.subtotal)}
+                      </p>
+                    </div>
+                  </div>
                 </div>
+              );
+            })}
+          </div>
 
-                <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
-                  <div>
-                    <p className="text-xs font-bold text-slate-500">Cantidad</p>
-                    <p className="font-bold text-slate-950">{item.quantity}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-bold text-slate-500">Precio</p>
-                    <p className="font-bold text-slate-950">
-                      {formatMoney(item.unitPriceSnapshot)}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-bold text-slate-500">Subtotal</p>
-                    <p className="font-bold text-slate-950">
-                      {formatMoney(item.subtotal)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {customerOrder.items.length > itemPageSize ? (
+            <Pagination
+              currentPage={currentItemPage}
+              totalItems={customerOrder.items.length}
+              pageSize={itemPageSize}
+              pageSizeOptions={[5, 10, 20, 50]}
+              onPageChange={setCurrentItemPage}
+              onPageSizeChange={setItemPageSize}
+              itemLabel="artículos"
+            />
+          ) : null}
         </div>
       ) : null}
     </article>
+  );
+}
+
+function CustomerOrderRows({
+  customerOrder,
+}: {
+  customerOrder: CustomerOrder;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [currentItemPage, setCurrentItemPage] = useState(1);
+  const [itemPageSize, setItemPageSize] = useState(10);
+
+  const paid = getCustomerPaidAmount(customerOrder);
+  const pending = getCustomerPendingAmount(customerOrder);
+  const paymentStatus = getCustomerPaymentStatus(customerOrder);
+
+  const paginatedItems = useMemo(() => {
+    return getPaginatedData(
+      customerOrder.items,
+      currentItemPage,
+      itemPageSize,
+    );
+  }, [customerOrder.items, currentItemPage, itemPageSize]);
+
+  useEffect(() => {
+    setCurrentItemPage(1);
+  }, [itemPageSize]);
+
+  return (
+    <Fragment>
+      <tr className="hover:bg-slate-50">
+        <td className="px-5 py-4">
+          <button
+            type="button"
+            onClick={() => setIsExpanded((current) => !current)}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-lg font-black text-slate-700 hover:bg-slate-100"
+          >
+            {isExpanded ? "−" : "+"}
+          </button>
+        </td>
+
+        <td className="whitespace-nowrap px-5 py-4">
+          <p className="font-extrabold text-slate-950">
+            {customerOrder.customer.name}
+          </p>
+
+          <p className="mt-1 text-xs text-slate-500">
+            ID #{customerOrder.customer.id}
+          </p>
+        </td>
+
+        <td className="whitespace-nowrap px-5 py-4 text-sm font-bold text-slate-700">
+          {customerOrder.customer.phone ?? "Sin teléfono"}
+        </td>
+
+        <td className="whitespace-nowrap px-5 py-4 text-right font-extrabold text-slate-950">
+          {formatMoney(customerOrder.total)}
+        </td>
+
+        <td className="whitespace-nowrap px-5 py-4 text-right font-extrabold text-emerald-700">
+          {formatMoney(paid)}
+        </td>
+
+        <td className="whitespace-nowrap px-5 py-4 text-right font-extrabold text-yellow-700">
+          {formatMoney(pending)}
+        </td>
+
+        <td className="whitespace-nowrap px-5 py-4 text-right">
+          <span
+            className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${paymentStatus.className}`}
+          >
+            {paymentStatus.label}
+          </span>
+        </td>
+      </tr>
+
+      {isExpanded ? (
+        <tr>
+          <td colSpan={7} className="bg-slate-50 px-6 py-5">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <div className="border-b border-slate-200 bg-slate-100 p-4">
+                <h4 className="font-extrabold text-slate-950">
+                  Artículos de {customerOrder.customer.name}
+                </h4>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Subtabla paginada de productos incluidos para este cliente.
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-white">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
+                        SKU
+                      </th>
+
+                      <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
+                        Artículo
+                      </th>
+
+                      <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
+                        Cantidad
+                      </th>
+
+                      <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
+                        Precio
+                      </th>
+
+                      <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
+                        Subtotal
+                      </th>
+
+                      <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
+                        Estado
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-slate-100">
+                    {paginatedItems.map((item) => {
+                      const itemStatus = getItemPaymentStatus(item);
+
+                      return (
+                        <tr key={item.id}>
+                          <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-slate-700">
+                            {item.skuSnapshot}
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <p className="font-bold text-slate-950">
+                              {item.nameSnapshot}
+                            </p>
+
+                            <p className="mt-1 text-sm text-slate-500">
+                              {item.descriptionSnapshot ?? "Sin descripción"}
+                            </p>
+                          </td>
+
+                          <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-bold text-slate-700">
+                            {item.quantity}
+                          </td>
+
+                          <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-bold text-slate-700">
+                            {formatMoney(item.unitPriceSnapshot)}
+                          </td>
+
+                          <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-extrabold text-slate-950">
+                            {formatMoney(item.subtotal)}
+                          </td>
+
+                          <td className="whitespace-nowrap px-4 py-3 text-right">
+                            <span
+                              className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${itemStatus.className}`}
+                            >
+                              {itemStatus.label}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {customerOrder.items.length > itemPageSize ? (
+                <div className="p-4">
+                  <Pagination
+                    currentPage={currentItemPage}
+                    totalItems={customerOrder.items.length}
+                    pageSize={itemPageSize}
+                    pageSizeOptions={[5, 10, 20, 50]}
+                    onPageChange={setCurrentItemPage}
+                    onPageSizeChange={setItemPageSize}
+                    itemLabel="artículos"
+                  />
+                </div>
+              ) : null}
+            </div>
+          </td>
+        </tr>
+      ) : null}
+    </Fragment>
   );
 }
 
@@ -257,6 +493,9 @@ export function OrderDetailPage() {
   const { id } = useParams();
 
   const orderId = Number(id);
+
+  const [currentCustomerPage, setCurrentCustomerPage] = useState(1);
+  const [customerPageSize, setCustomerPageSize] = useState(5);
 
   const {
     data: orderResponse,
@@ -269,6 +508,18 @@ export function OrderDetailPage() {
   });
 
   const order = orderResponse?.data;
+
+  const paginatedCustomerOrders = useMemo(() => {
+    return getPaginatedData(
+      order?.customerOrders ?? [],
+      currentCustomerPage,
+      customerPageSize,
+    );
+  }, [order?.customerOrders, currentCustomerPage, customerPageSize]);
+
+  useEffect(() => {
+    setCurrentCustomerPage(1);
+  }, [customerPageSize, orderId]);
 
   const totalPaid =
     order?.customerOrders.reduce((total, customerOrder) => {
@@ -352,9 +603,7 @@ export function OrderDetailPage() {
           <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-sm font-bold text-slate-500">
-                  Vendedor
-                </p>
+                <p className="text-sm font-bold text-slate-500">Vendedor</p>
 
                 <p className="mt-1 text-xl font-extrabold text-slate-950">
                   {order.seller.name}
@@ -447,13 +696,13 @@ export function OrderDetailPage() {
               </h3>
 
               <p className="mt-1 text-sm text-slate-500">
-                Cada cliente puede desplegar su subtabla de artículos.
+                Clientes paginados. Cada cliente puede desplegar su subtabla de
+                artículos.
               </p>
             </div>
 
-            {/* Mobile cards */}
             <div className="mt-5 grid gap-4 xl:hidden">
-              {order.customerOrders.map((customerOrder) => (
+              {paginatedCustomerOrders.map((customerOrder) => (
                 <CustomerMobileCard
                   key={customerOrder.id}
                   customerOrder={customerOrder}
@@ -461,7 +710,6 @@ export function OrderDetailPage() {
               ))}
             </div>
 
-            {/* Desktop table */}
             <div className="mt-5 hidden overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm xl:block">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200">
@@ -496,7 +744,7 @@ export function OrderDetailPage() {
                   </thead>
 
                   <tbody className="divide-y divide-slate-100">
-                    {order.customerOrders.map((customerOrder) => (
+                    {paginatedCustomerOrders.map((customerOrder) => (
                       <CustomerOrderRows
                         key={customerOrder.id}
                         customerOrder={customerOrder}
@@ -506,165 +754,21 @@ export function OrderDetailPage() {
                 </table>
               </div>
             </div>
+
+            {order.customerOrders.length > customerPageSize ? (
+              <Pagination
+                currentPage={currentCustomerPage}
+                totalItems={order.customerOrders.length}
+                pageSize={customerPageSize}
+                pageSizeOptions={[5, 10, 20, 50]}
+                onPageChange={setCurrentCustomerPage}
+                onPageSizeChange={setCustomerPageSize}
+                itemLabel="clientes"
+              />
+            ) : null}
           </section>
         </>
       )}
     </AppLayout>
-  );
-}
-
-function CustomerOrderRows({
-  customerOrder,
-}: {
-  customerOrder: CustomerOrder;
-}) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  const paid = getCustomerPaidAmount(customerOrder);
-  const pending = getCustomerPendingAmount(customerOrder);
-  const paymentStatus = getCustomerPaymentStatus(customerOrder);
-
-  return (
-    <Fragment>
-      <tr className="hover:bg-slate-50">
-        <td className="px-5 py-4">
-          <button
-            type="button"
-            onClick={() => setIsExpanded((current) => !current)}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white text-lg font-black text-slate-700 hover:bg-slate-100"
-          >
-            {isExpanded ? "−" : "+"}
-          </button>
-        </td>
-
-        <td className="whitespace-nowrap px-5 py-4">
-          <p className="font-extrabold text-slate-950">
-            {customerOrder.customer.name}
-          </p>
-
-          <p className="mt-1 text-xs text-slate-500">
-            ID #{customerOrder.customer.id}
-          </p>
-        </td>
-
-        <td className="whitespace-nowrap px-5 py-4 text-sm font-bold text-slate-700">
-          {customerOrder.customer.phone ?? "Sin teléfono"}
-        </td>
-
-        <td className="whitespace-nowrap px-5 py-4 text-right font-extrabold text-slate-950">
-          {formatMoney(customerOrder.total)}
-        </td>
-
-        <td className="whitespace-nowrap px-5 py-4 text-right font-extrabold text-emerald-700">
-          {formatMoney(paid)}
-        </td>
-
-        <td className="whitespace-nowrap px-5 py-4 text-right font-extrabold text-yellow-700">
-          {formatMoney(pending)}
-        </td>
-
-        <td className="whitespace-nowrap px-5 py-4 text-right">
-          <span
-            className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${paymentStatus.className}`}
-          >
-            {paymentStatus.label}
-          </span>
-        </td>
-      </tr>
-
-      {isExpanded ? (
-        <tr>
-          <td colSpan={7} className="bg-slate-50 px-6 py-5">
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-              <div className="border-b border-slate-200 bg-slate-100 p-4">
-                <h4 className="font-extrabold text-slate-950">
-                  Artículos de {customerOrder.customer.name}
-                </h4>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  Subtabla de productos incluidos para este cliente.
-                </p>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200">
-                  <thead className="bg-white">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
-                        SKU
-                      </th>
-
-                      <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-500">
-                        Artículo
-                      </th>
-
-                      <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
-                        Cantidad
-                      </th>
-
-                      <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
-                        Precio
-                      </th>
-
-                      <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
-                        Subtotal
-                      </th>
-
-                      <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-500">
-                        Estado
-                      </th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-slate-100">
-                    {customerOrder.items.map((item) => {
-                      const itemStatus = getItemPaymentStatus(item);
-
-                      return (
-                        <tr key={item.id}>
-                          <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-slate-700">
-                            {item.skuSnapshot}
-                          </td>
-
-                          <td className="px-4 py-3">
-                            <p className="font-bold text-slate-950">
-                              {item.nameSnapshot}
-                            </p>
-
-                            <p className="mt-1 text-sm text-slate-500">
-                              {item.descriptionSnapshot ?? "Sin descripción"}
-                            </p>
-                          </td>
-
-                          <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-bold text-slate-700">
-                            {item.quantity}
-                          </td>
-
-                          <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-bold text-slate-700">
-                            {formatMoney(item.unitPriceSnapshot)}
-                          </td>
-
-                          <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-extrabold text-slate-950">
-                            {formatMoney(item.subtotal)}
-                          </td>
-
-                          <td className="whitespace-nowrap px-4 py-3 text-right">
-                            <span
-                              className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${itemStatus.className}`}
-                            >
-                              {itemStatus.label}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </td>
-        </tr>
-      ) : null}
-    </Fragment>
   );
 }
