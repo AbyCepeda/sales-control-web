@@ -4,6 +4,7 @@ import type {
   CreateCustomerOrderPaymentRequest,
   CreateOrderRequest,
   Order,
+  UpdateFullOrderRequest,
 } from "../features/orders/order.types";
 
 export const ordersApi = api.injectEndpoints({
@@ -31,6 +32,27 @@ export const ordersApi = api.injectEndpoints({
         body,
       }),
       invalidatesTags: ["Orders", "Products", "Dashboard", "Customers"],
+    }),
+
+    updateFullOrder: builder.mutation<
+      ApiResponse<Order>,
+      {
+        id: number;
+        body: UpdateFullOrderRequest;
+      }
+    >({
+      query: ({ id, body }) => ({
+        url: `/orders/${id}/full`,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        "Orders",
+        { type: "Orders", id },
+        "Products",
+        "Dashboard",
+        "Customers",
+      ],
     }),
 
     createCustomerOrderPayment: builder.mutation<
@@ -74,6 +96,7 @@ export const {
   useGetOrdersQuery,
   useGetOrderByIdQuery,
   useCreateOrderMutation,
+  useUpdateFullOrderMutation,
   useCreateCustomerOrderPaymentMutation,
   useDeleteCustomerOrderPaymentMutation,
 } = ordersApi;

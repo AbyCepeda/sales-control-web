@@ -110,6 +110,13 @@ export type CreateOrderRequest = {
   customers: CreateOrderCustomerRequest[];
 };
 
+export type UpdateFullOrderRequest = {
+  status?: OrderStatus;
+  deliveryDate?: string | null;
+  notes?: string | null;
+  customers: CreateOrderCustomerRequest[];
+};
+
 export type ApiResponse<T> = {
   success: boolean;
   message: string;
