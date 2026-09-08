@@ -8,6 +8,7 @@ import { EditOrderPage } from "./pages/EditOrderPage";
 import { OrderDetailPage } from "./pages/OrderDetailPage";
 import { OrdersPage } from "./pages/OrdersPage";
 import { ProductsPage } from "./pages/ProductsPage";
+import { ReportsPage } from "./pages/ReportsPage";
 import { UsersPage } from "./pages/UsersPage";
 
 export default function App() {
@@ -75,6 +76,15 @@ export default function App() {
         element={
           <PrivateRoute>
             <CustomersPage />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/reports"
+        element={
+          <PrivateRoute>
+            <ReportsPage />
           </PrivateRoute>
         }
       />
