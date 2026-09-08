@@ -1,10 +1,4 @@
-import {
-  Fragment,
-  useEffect,
-  useMemo,
-  useState,
-  type FormEvent,
-} from "react";
+import { Fragment, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AppLayout } from "../components/layout/AppLayout";
 import { AppButton } from "../components/ui/AppButton";
@@ -122,7 +116,11 @@ function getItemPaymentStatus(item: OrderItem) {
   };
 }
 
-function getPaginatedData<T>(items: T[], currentPage: number, pageSize: number) {
+function getPaginatedData<T>(
+  items: T[],
+  currentPage: number,
+  pageSize: number,
+) {
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
 
@@ -406,11 +404,7 @@ function CustomerMobileCard({
   const paymentStatus = getCustomerPaymentStatus(customerOrder);
 
   const paginatedItems = useMemo(() => {
-    return getPaginatedData(
-      customerOrder.items,
-      currentItemPage,
-      itemPageSize,
-    );
+    return getPaginatedData(customerOrder.items, currentItemPage, itemPageSize);
   }, [customerOrder.items, currentItemPage, itemPageSize]);
 
   useEffect(() => {
@@ -589,11 +583,7 @@ function CustomerOrderRows({
   const paymentStatus = getCustomerPaymentStatus(customerOrder);
 
   const paginatedItems = useMemo(() => {
-    return getPaginatedData(
-      customerOrder.items,
-      currentItemPage,
-      itemPageSize,
-    );
+    return getPaginatedData(customerOrder.items, currentItemPage, itemPageSize);
   }, [customerOrder.items, currentItemPage, itemPageSize]);
 
   useEffect(() => {
@@ -872,9 +862,7 @@ export function OrderDetailPage() {
       await deletePayment(paymentId).unwrap();
     } catch (error: any) {
       const message =
-        error?.data?.message ??
-        error?.error ??
-        "No se pudo eliminar el abono.";
+        error?.data?.message ?? error?.error ?? "No se pudo eliminar el abono.";
 
       alert(message);
     }
@@ -919,9 +907,18 @@ export function OrderDetailPage() {
           </p>
         </div>
 
-        <AppButton variant="outline" onClick={() => refetch()}>
-          {isFetching ? "Actualizando..." : "Actualizar"}
-        </AppButton>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Link
+            to={`/orders/${orderId}/edit`}
+            className="rounded-xl bg-slate-950 px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-slate-800"
+          >
+            Editar pedido
+          </Link>
+
+          <AppButton variant="outline" onClick={() => refetch()}>
+            {isFetching ? "Actualizando..." : "Actualizar"}
+          </AppButton>
+        </div>
       </div>
 
       {isLoading ? (
